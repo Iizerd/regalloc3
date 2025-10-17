@@ -6,10 +6,8 @@
 //!   first. Give more priority to more frequent uses.
 //! - Otherwise defer to the register class for its allocation order.
 
-use core::cmp::Reverse;
+use core::cmp::Ordering;
 use core::fmt;
-
-use ordered_float::OrderedFloat;
 
 use super::AbstractVirtRegGroup;
 use crate::entity::{PackedOption, SecondaryMap, SparseMap};
@@ -86,11 +84,18 @@ impl<V: AbstractVirtRegGroup> AllocationOrder<V> {
         // If there are hinted registers, they need to be sorted in order
         // of decreasing weight.
         if self.hinted_regs.len() > 1 {
-            self.hinted_regs
-                .as_mut_vec()
-                .sort_unstable_by_key(|&(_reg, preference_weight)| {
-                    Reverse(OrderedFloat(preference_weight))
-                });
+            self.hinted_regs.as_mut_vec().sort_unstable_by(
+                |&(_reg1, preference_weight1), &(_reg2, preference_weight2)| {
+                    // Note: the variables are reversed here to sort in order of decreasing weight.
+                    if preference_weight2 < preference_weight1 {
+                        Ordering::Less
+                    } else if preference_weight2 > preference_weight1 {
+                        Ordering::Greater
+                    } else {
+                        Ordering::Equal
+                    }
+                },
+            );
             self.hinted_regs.rebuild_mapping();
         }
 
