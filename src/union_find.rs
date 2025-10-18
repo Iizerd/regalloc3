@@ -12,7 +12,7 @@ struct UnionFindEntry<K> {
     /// The parent of this node. Roots are their own parent.
     parent: K,
 
-    /// The rank is the upper bound of the
+    /// The rank is the upper bound of the height of this sub-tree.
     rank: u32,
 }
 
