@@ -144,6 +144,7 @@ struct TiedMove {
     move_pos: MovePosition,
     inst: Inst,
     value: Value,
+    orig_value: Value,
     def_slot: u16,
     class: RegClass,
     group_index: u8,
@@ -280,7 +281,8 @@ impl MoveResolver {
                 // Record the allocation assigned to the block parameter
                 // for the move optimizer.
                 let block = func.inst_block(tied.inst);
-                self.blockparam_allocs.push((block, tied.value, def_alloc));
+                self.blockparam_allocs
+                    .push((block, tied.orig_value, def_alloc));
             }
         }
 
@@ -464,6 +466,7 @@ impl MoveResolver {
                         move_pos: MovePosition::early(u.pos),
                         inst: u.pos,
                         value: segment.value,
+                        orig_value: segment.value,
                         def_slot,
                         class,
                         group_index,
@@ -892,6 +895,7 @@ impl<F: Function> Context<'_, F> {
                             move_pos,
                             inst: u.pos,
                             value: src_value,
+                            orig_value: segment.value,
                             def_slot,
                             class,
                             group_index,
