@@ -283,6 +283,10 @@ impl MoveResolver {
                 let block = func.inst_block(tied.inst);
                 self.blockparam_allocs
                     .push((block, tied.orig_value, def_alloc));
+                trace!(
+                    "blockparam_alloc_tied ({block}, {}, {def_alloc})",
+                    tied.value
+                );
             }
         }
 
@@ -857,6 +861,11 @@ impl<F: Function> Context<'_, F> {
                                 segment.value,
                                 Allocation::reg(reg),
                             ));
+                            trace!(
+                                "blockparam_alloc_fixed ({block}, {}, {})",
+                                segment.value,
+                                Allocation::reg(reg)
+                            );
                         }
                     },
                 );
@@ -990,6 +999,10 @@ impl<F: Function> Context<'_, F> {
                     self.move_resolver
                         .blockparam_allocs
                         .push((block, segment.value, alloc));
+                    trace!(
+                        "blockparam_alloc_usekind ({block}, {}, {alloc})",
+                        segment.value
+                    );
                 }
 
                 // Indicate that fixed uses on the first instruction

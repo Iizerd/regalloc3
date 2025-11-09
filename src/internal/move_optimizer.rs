@@ -791,6 +791,7 @@ impl StateTracker {
         // Define blockparam values. The corresponding moves are in predecessor
         // blocks, but tagged with the outgoing value.
         for (value, alloc) in move_resolver.blockparam_allocs(block) {
+            trace!("Blockparam {value} in {alloc}");
             self.def_value(value, alloc, block, reginfo);
         }
         let mut edits = move_resolver.edits_from_mut(func.block_insts(block).from);

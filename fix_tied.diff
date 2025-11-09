@@ -1,0 +1,140 @@
+diff --git a/src/debug_utils/checker.rs b/src/debug_utils/checker.rs
+index ba46056..17d2ba3 100644
+--- a/src/debug_utils/checker.rs
++++ b/src/debug_utils/checker.rs
+@@ -423,12 +423,14 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
+                     self.check_bank(to, bank)?;
+                     ensure!(
+                         !from.is_memory(reginfo) || !to.is_memory(reginfo),
+-                        "Stack to stack move between {from} and {to}"
++                        "before {}: Stack to stack move between {from} and {to}",
++                        self.next_inst
+                     );
+                     for unit in from.units(reginfo) {
+                         ensure!(
+                             self.state.unit_contains(unit, value),
+-                            "{unit} in {from} does not contain {value}"
++                            "before {}: {unit} in {from} does not contain {value}",
++                            self.next_inst
+                         );
+                     }
+                     for unit in to.units(reginfo) {
+@@ -663,7 +665,10 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
+             OperandKind::Def(value) | OperandKind::EarlyDef(value) => {
+                 self.state.remove_value(value);
+                 for unit in alloc.units(reginfo) {
+-                    ensure!(!self.def_units.contains(unit), "Conflicting def on {unit}");
++                    ensure!(
++                        !self.def_units.contains(unit),
++                        "{inst}: Conflicting def on {unit}"
++                    );
+                     self.def_units.insert(unit);
+                     self.state.set_value(unit, value);
+                 }
+@@ -675,7 +680,7 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
+                 for unit in alloc.units(reginfo) {
+                     ensure!(
+                         self.state.unit_contains(unit, value),
+-                        "{unit} in {alloc} does not contain {value}"
++                        "{inst}: {unit} in {alloc} does not contain {value}"
+                     );
+                 }
+             }
+@@ -700,7 +705,10 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
+                 {
+                     self.state.remove_value(value);
+                     for unit in Allocation::reg(reg).units(reginfo) {
+-                        ensure!(!self.def_units.contains(unit), "Conflicting def on {unit}");
++                        ensure!(
++                            !self.def_units.contains(unit),
++                            "{inst}: Conflicting def on {unit}"
++                        );
+                         self.def_units.insert(unit);
+                         self.state.set_value(unit, value);
+                     }
+@@ -719,7 +727,7 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
+                     for unit in Allocation::reg(reg).units(reginfo) {
+                         ensure!(
+                             self.state.unit_contains(unit, value),
+-                            "{unit} in {reg} does not contain {value}"
++                            "{inst}: {unit} in {reg} does not contain {value}"
+                         );
+                     }
+                 }
+diff --git a/src/internal/move_optimizer.rs b/src/internal/move_optimizer.rs
+index 486e5df..e91ed55 100644
+--- a/src/internal/move_optimizer.rs
++++ b/src/internal/move_optimizer.rs
+@@ -791,6 +791,7 @@ impl StateTracker {
+         // Define blockparam values. The corresponding moves are in predecessor
+         // blocks, but tagged with the outgoing value.
+         for (value, alloc) in move_resolver.blockparam_allocs(block) {
++            trace!("Blockparam {value} in {alloc}");
+             self.def_value(value, alloc, block, reginfo);
+         }
+         let mut edits = move_resolver.edits_from_mut(func.block_insts(block).from);
+diff --git a/src/internal/move_resolver.rs b/src/internal/move_resolver.rs
+index c7053df..3ce6f0b 100644
+--- a/src/internal/move_resolver.rs
++++ b/src/internal/move_resolver.rs
+@@ -144,6 +144,7 @@ struct TiedMove {
+     move_pos: MovePosition,
+     inst: Inst,
+     value: Value,
++    orig_value: Value,
+     def_slot: u16,
+     class: RegClass,
+     group_index: u8,
+@@ -280,7 +281,12 @@ impl MoveResolver {
+                 // Record the allocation assigned to the block parameter
+                 // for the move optimizer.
+                 let block = func.inst_block(tied.inst);
+-                self.blockparam_allocs.push((block, tied.value, def_alloc));
++                self.blockparam_allocs
++                    .push((block, tied.orig_value, def_alloc));
++                trace!(
++                    "blockparam_alloc_tied ({block}, {}, {def_alloc})",
++                    tied.value
++                );
+             }
+         }
+ 
+@@ -464,6 +470,7 @@ impl MoveResolver {
+                         move_pos: MovePosition::early(u.pos),
+                         inst: u.pos,
+                         value: segment.value,
++                        orig_value: segment.value,
+                         def_slot,
+                         class,
+                         group_index,
+@@ -854,6 +861,11 @@ impl<F: Function> Context<'_, F> {
+                                 segment.value,
+                                 Allocation::reg(reg),
+                             ));
++                            trace!(
++                                "blockparam_alloc_fixed ({block}, {}, {})",
++                                segment.value,
++                                Allocation::reg(reg)
++                            );
+                         }
+                     },
+                 );
+@@ -892,6 +904,7 @@ impl<F: Function> Context<'_, F> {
+                             move_pos,
+                             inst: u.pos,
+                             value: src_value,
++                            orig_value: segment.value,
+                             def_slot,
+                             class,
+                             group_index,
+@@ -986,6 +999,10 @@ impl<F: Function> Context<'_, F> {
+                     self.move_resolver
+                         .blockparam_allocs
+                         .push((block, segment.value, alloc));
++                    trace!(
++                        "blockparam_alloc_usekind ({block}, {}, {alloc})",
++                        segment.value
++                    );
+                 }
+ 
+                 // Indicate that fixed uses on the first instruction

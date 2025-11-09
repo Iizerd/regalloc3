@@ -423,12 +423,14 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
                     self.check_bank(to, bank)?;
                     ensure!(
                         !from.is_memory(reginfo) || !to.is_memory(reginfo),
-                        "Stack to stack move between {from} and {to}"
+                        "before {}: Stack to stack move between {from} and {to}",
+                        self.next_inst
                     );
                     for unit in from.units(reginfo) {
                         ensure!(
                             self.state.unit_contains(unit, value),
-                            "{unit} in {from} does not contain {value}"
+                            "before {}: {unit} in {from} does not contain {value}",
+                            self.next_inst
                         );
                     }
                     for unit in to.units(reginfo) {
@@ -663,7 +665,10 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
             OperandKind::Def(value) | OperandKind::EarlyDef(value) => {
                 self.state.remove_value(value);
                 for unit in alloc.units(reginfo) {
-                    ensure!(!self.def_units.contains(unit), "Conflicting def on {unit}");
+                    ensure!(
+                        !self.def_units.contains(unit),
+                        "{inst}: Conflicting def on {unit}"
+                    );
                     self.def_units.insert(unit);
                     self.state.set_value(unit, value);
                 }
@@ -675,7 +680,7 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
                 for unit in alloc.units(reginfo) {
                     ensure!(
                         self.state.unit_contains(unit, value),
-                        "{unit} in {alloc} does not contain {value}"
+                        "{inst}: {unit} in {alloc} does not contain {value}"
                     );
                 }
             }
@@ -700,7 +705,10 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
                 {
                     self.state.remove_value(value);
                     for unit in Allocation::reg(reg).units(reginfo) {
-                        ensure!(!self.def_units.contains(unit), "Conflicting def on {unit}");
+                        ensure!(
+                            !self.def_units.contains(unit),
+                            "{inst}: Conflicting def on {unit}"
+                        );
                         self.def_units.insert(unit);
                         self.state.set_value(unit, value);
                     }
@@ -719,7 +727,7 @@ impl<F: Function, R: RegInfo> Context<'_, F, R> {
                     for unit in Allocation::reg(reg).units(reginfo) {
                         ensure!(
                             self.state.unit_contains(unit, value),
-                            "{unit} in {reg} does not contain {value}"
+                            "{inst}: {unit} in {reg} does not contain {value}"
                         );
                     }
                 }
